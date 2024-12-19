@@ -72,15 +72,25 @@ Will be updated soon.
 
 
 **Reconstruction**
-
+```
+torchrun --nproc_per_node=8 inference/reconstruct_vq.py --data-path ./ImageNet/val --vq-model SoftVQVAE/softvq-l-64 
+```
 
 
 **SiT Generation**
-
-
+```
+torchrun --nproc_per_node=8 inference/generate_sit.py --tf32 True --model SiT-XL/1 --cfg-scale 1.75 --path-type cosine --num-steps 250 --guidance-high 0.7 --vae-model softvq-l-64
+```
 
 **DiT Generation**
+```
+torchrun --nproc_per_node=8 inference/generate_dit.py --model DiT-XL/1 --cfg-scale 1.75 --noise-schedule cosine --num-sampling-steps 250 --vae-model softvq-l-64
+```
 
+
+**Evaluation**
+
+We use [ADM](https://github.com/openai/guided-diffusion/tree/main) evaluation toolkit to compute the FID/IS of generated samples
 
 
 
@@ -89,6 +99,7 @@ Will be updated soon.
 @article{chen2024softvqvae,
     title={SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer},
     author={Hao Chen and Ze Wang and Xiang Li and Ximeng Sun and Fangyi Chen and Jiang Liu and Jindong Wang and Bhiksha Raj and Zicheng Liu and Emad Barsoum},
+    journal={arXiv preprint arXiv:2412.10958},
     year={2024},
 }
 ```
