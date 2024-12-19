@@ -57,7 +57,15 @@ pip install -r requirements.txt
 
 ## Training 
 
-Will be released soon.
+Will be updated soon.
+
+### Train Tokenizer
+
+
+### Train SiT
+
+
+### Train DiT
 
 
 ## Inference
