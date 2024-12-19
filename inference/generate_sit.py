@@ -230,7 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-fid-samples", type=int, default=50_000)
 
     # sampling related hyperparameters
-    parser.add_argument("--mode", type=str, default="ode")
+    parser.add_argument("--mode", type=str, default="sde")
     parser.add_argument("--cfg-scale",  type=float, default=1.5)
     parser.add_argument("--path-type", type=str, default="linear", choices=["linear", "cosine"])
     parser.add_argument("--num-steps", type=int, default=50)
