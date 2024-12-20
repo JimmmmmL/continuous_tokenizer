@@ -11,7 +11,7 @@ from torch.nn.utils.spectral_norm import SpectralNorm
 from torchvision.transforms import RandomCrop
 
 
-import tokenizer.discriminators.dist as dist
+import modelling.discriminators.dist as dist
 
 try:
     from flash_attn.ops.layer_norm import dropout_add_layer_norm

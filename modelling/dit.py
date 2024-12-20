@@ -356,10 +356,7 @@ class DiT(nn.Module, PyTorchModelHubMixin):
             
         # x = self.unpatchify(x)                   # (N, out_channels, H, W)
         # x = x.permute(0, 2, 1).contiguous()       # (N, patch_size ** 2 * out_channels, T)
-        if self.repa and self.training:
-            return x, zs
-        else:
-            return x
+        return x
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """

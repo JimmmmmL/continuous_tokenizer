@@ -29,44 +29,55 @@ pip install -r requirements.txt
 ### Tokenizers
 
 
-| Tokenizer 	| rFID 	| Huggingface 	|
-|:---:	|:---:	|:---:	|
-| SoftVQ-L-64 	| 0.61 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-64) 	|
-| SoftVQ-BL-64 	| 0.65 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-bl-64) 	|
-| SoftVQ-B-64 	| 0.88 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-b-64) 	|
-| SoftVQ-L-32 	| 0.74 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-32) 	|
-| SoftVQ-BL-32 	| 0.68 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-bl-32) 	|
-| SoftVQ-B-32 	| 0.89 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-b-32) 	|
+| Tokenizer 	| Image Size | rFID 	| Huggingface 	|
+|:---:	| :---:	| :---:	|:---:	|
+| SoftVQ-L-64 	| 256 | 0.61 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-64) 	|
+| SoftVQ-BL-64 	| 256 | 0.65 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-bl-64) 	|
+| SoftVQ-B-64 	| 256 | 0.88 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-b-64) 	|
+| SoftVQ-L-32 	| 256 | 0.74 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-32) 	|
+| SoftVQ-BL-32 	| 256 | 0.68 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-bl-32) 	|
+| SoftVQ-B-32 	| 256 | 0.89 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-b-32) 	|
+| SoftVQ-BL-64 	| 512 | 0.71 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-bl-64-512) 	|
+| SoftVQ-L-32 	| 512 | 0.64 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-32-512) 	|
 
 
 ### SiT-XL Models
 
-| Genenerative Model 	| Tokenizer 	| gFID (w/o CFG) 	| Huggingface 	|
-|:---:	|:---:	|:---:	|:---:	|
-| SiT-XL 	| SoftVQ-L-64 	| 5.35 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-64) 	|
-| SiT-XL 	| SoftVQ-BL-64 	| 5.80 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-64) 	|
-| SiT-XL 	| SoftVQ-B-64 	| 5.98 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-b-64) 	|
-| SiT-XL 	| SoftVQ-L-32 	| 7.59 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-32) 	|
-| SiT-XL 	| SoftVQ-BL-32 	| 7.69 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-32) 	|
-| SiT-XL 	| SoftVQ-B-32 	| 7.99 	| [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-b-32) 	|
-
+| Genenerative Model | Image Size	| Tokenizer 	| gFID (w/o CFG) |	gFID (w/ CFG)| Huggingface 	|
+|:---:	|:---:	|:---:	|:---:	|:---:	|:---:	|
+| SiT-XL 	| 256 | SoftVQ-L-64 	| 5.35 	| 1.86 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-64) 	|
+| SiT-XL 	| 256 | SoftVQ-BL-64 	| 5.80 	| 1.88 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-64) 	|
+| SiT-XL 	| 256 | SoftVQ-B-64 	| 5.98 	| 1.78 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-b-64) 	|
+| SiT-XL 	| 256 | SoftVQ-L-32 	| 7.59 	| 2.44 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-32) 	|
+| SiT-XL 	| 256 | SoftVQ-BL-32 	| 7.67 	| 2.44 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-32) 	|
+| SiT-XL 	| 256 | SoftVQ-B-32 	| 7.99 	| 2.51 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-b-32) 	|
+| SiT-XL 	| 512 | SoftVQ-BL-64 	| 7.96 	| 2.21 |[Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-64-512) 	|
+| SiT-XL 	| 512 | SoftVQ-L-32 	| 10.97 	| 4.23 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-32-512) 	|
 
 ### DiT-XL Models
 
+| Genenerative Model | Image Size	| Tokenizer 	| gFID (w/o CFG) 	| gFID (w/ CFG) | Huggingface 	|
+|:---:	|:---:	|:---:	|:---:	|:---:	|:---:	|
+| DiT-XL 	| 256 | SoftVQ-L-64 	| 5.83 	| 2.93 | [Model Weight](https://huggingface.co/SoftVQVAE/dit-xl_softvq-l-64) 	|
+| DiT-XL 	| 256 | SoftVQ-L-32 	| 9.07 	| 3.69 | [Model Weight](https://huggingface.co/SoftVQVAE/dit-xl_softvq-bl-64) 	|
 
 
 ## Training 
 
-Will be updated soon.
+**Train Tokenizer**
+```
+torchrun --nproc_per_node=8 train/train_tokenizer.py --config configs/softvq-l-64.yaml
+```
 
-### Train Tokenizer
+**Train SiT**
+```
+torchrun --nproc_per_node=8 train/train_sit.py --report-to="wandb" --allow-tf32 --mixed-precision="bf16" --seed=0 --path-type="linear" --prediction="v" --weighting="lognormal" --model="SiT-XL/1" --vae-model='softvq-l-64' --output-dir="experiments/sit" --exp-index=1 --data-dir=./imagenet/train
+```
 
-
-### Train SiT
-
-
-### Train DiT
-
+**Train DiT**
+```
+torchrun --nproc_per_node=8 train/train_dit.py --data-path ./imagenet/train --results-dir experiments/dit --model DiT-XL/1 --epochs 1400 --global-batch-size 256 --mixed-precision bf16 --vae-model='softvq-l-64'  --noise-schedule cosine  --disable-compile
+```
 
 ## Inference
 

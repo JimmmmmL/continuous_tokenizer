@@ -31,9 +31,6 @@ from modelling.diffusion import create_diffusion
 from modelling.dit import DiT, DiT_models
 from modelling.tokenizer import SoftVQModel
 
-from torchmetrics.image.fid import FrechetInceptionDistance
-from torchmetrics.image.inception import InceptionScore
-
 
 def create_npz_from_sample_folder(sample_dir, num=50_000):
     """
