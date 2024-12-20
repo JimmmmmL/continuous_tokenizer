@@ -12,7 +12,7 @@
 
 
 ## Change Logs
-
+* [12/19/2024] 512 SiT models and DiT models released. We also updated the training scripts.
 * [12/18/2024] All models have been released at: https://huggingface.co/SoftVQVAE. Checkout [demo](demo/sit.ipynb) here. 
 
 
