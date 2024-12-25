@@ -90,7 +90,7 @@ class SelfAttentionNoDrop(nn.Module):
                 q, k, v,
                 dropout_p=0.,
             )
-            x = x.transpose(1, 2).reshape(B, L, C)
+            oup = oup.transpose(1, 2).reshape(B, L, C)
         return self.proj(oup)
 
     def extra_repr(self) -> str:
