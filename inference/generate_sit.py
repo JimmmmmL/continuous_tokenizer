@@ -16,7 +16,7 @@ import torch.distributed as dist
 from tqdm import tqdm
 import os
 import sys
-sys.path.append('/storage/haoc/continuous_tokenizer')
+sys.path.append('../')
 
 from PIL import Image
 import numpy as np

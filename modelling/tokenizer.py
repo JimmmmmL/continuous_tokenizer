@@ -37,6 +37,8 @@ def build_mlp(hidden_size, projector_dim, z_dim):
 @dataclass
 class ModelArgs:
     image_size: int = 256
+    base_image_size: int = 256
+    
     codebook_size: int = 16384
     codebook_embed_dim: int = 8
     codebook_l2_norm: bool = True
@@ -58,6 +60,7 @@ class ModelArgs:
     encoder_model: str = 'llamagen_encoder'
     decoder_model: str = 'llamagen_decoder'
     num_latent_tokens: int = 256
+    to_pixel: str = 'linear'
     
     # for pre-trained models
     enc_tuning_method: str = 'full'
@@ -70,13 +73,25 @@ class ModelArgs:
     dec_patch_size: int = 16
     enc_drop_path_rate: float = 0.0
     dec_drop_path_rate: float = 0.0
+
+    # encoder token drop
+    enc_token_drop: float = 0.0
+    enc_token_drop_max: float = 0.6
+    
+    # deocder cls token
+    dec_cls_token: bool = True
+    
+    # rope
+    use_ape: bool = True 
+    use_rope: bool = False
+    rope_mixed: bool = False
+    rope_theta: float = 10.0
     
     # repa for vit
     repa: bool = False
     repa_patch_size: int = 16
     repa_model: str = 'vit_base_patch16_224'
     repa_proj_dim: int = 2048
-    repa_layer_indices: List[int] = field(default_factory=lambda: [8])
     repa_loss_weight: float = 0.1
     repa_align: str = 'global'
     
@@ -128,6 +143,10 @@ class VQModel(nn.Module, PyTorchModelHubMixin):
                 pretrained=config.enc_pretrained,
                 tuning_method=config.enc_tuning_method,
                 tuning_kwargs={'r': 8},
+                use_ape=config.use_ape, use_rope=config.use_rope, rope_mixed=config.rope_mixed, rope_theta=config.rope_theta,
+                token_drop=config.enc_token_drop,
+                token_drop_max=config.enc_token_drop_max,
+                base_img_size=config.base_image_size
             )
             self.quant_conv = nn.Linear(self.encoder.embed_dim, config.codebook_embed_dim)
             
@@ -142,12 +161,22 @@ class VQModel(nn.Module, PyTorchModelHubMixin):
             self.decoder = TimmViTDecoder(
                 in_channels=3, num_latent_tokens=config.num_latent_tokens,
                 model_name=config.decoder_model,  # 'vit_small_patch14_dinov2.lvd142m', #'vit_base_patch14_dinov2.lvd142m',  #
-                model_kwargs={'img_size': config.image_size, 'patch_size': config.dec_patch_size, 'drop_path_rate': config.dec_drop_path_rate},
+                model_kwargs={'img_size': config.image_size, 'patch_size': config.dec_patch_size, 'drop_path_rate': config.dec_drop_path_rate, 'latent_dim': config.codebook_embed_dim},
                 pretrained=config.dec_pretrained,
                 tuning_method=config.dec_tuning_method,
                 tuning_kwargs={'r': 8},
+                use_ape=config.use_ape, use_rope=config.use_rope, rope_mixed=config.rope_mixed, rope_theta=config.rope_theta,
+                cls_token=config.dec_cls_token,
+                codebook_embed_dim=config.codebook_embed_dim,
+                to_pixel=config.to_pixel,
+                base_img_size=config.base_image_size
             )
             self.post_quant_conv = nn.Linear(config.codebook_embed_dim, self.decoder.embed_dim)
+        # check movq
+        if 'movq' in config.decoder_model:
+            self.use_movq = True 
+        else:
+            self.use_movq = False
         
         
         self.quantize = VectorQuantizer(config.codebook_size, config.codebook_embed_dim, 
@@ -196,9 +225,13 @@ class VQModel(nn.Module, PyTorchModelHubMixin):
         
         return quant, emb_loss, info
 
-    def decode(self, quant):
+    def decode(self, quant, x=None, h=None, w=None):
+        tmp_quant = quant 
         quant = self.post_quant_conv(quant)
-        dec = self.decoder(quant)
+        if self.use_movq:
+            dec = self.decoder(quant, tmp_quant, h, w)
+        else:
+            dec = self.decoder(quant, None, h, w)
         return dec
 
     def decode_code(self, code_b, shape=None, channel_first=True):
@@ -207,9 +240,10 @@ class VQModel(nn.Module, PyTorchModelHubMixin):
         return dec
 
     def forward(self, input):
+        b, _, h, w = input.size()
         quant, diff, info = self.encode(input)
         self.quant = quant
-        dec = self.decode(quant)
+        dec = self.decode(quant, x=input, h=h, w=w)
         return dec, diff, info
 
 
@@ -269,31 +303,36 @@ class KLModel(VQModel):
         return dec, diff, None
 
 
-class AE(VQModel):
-    def __init__(self, config):
+class AEModel(VQModel):
+    def __init__(self, config: ModelArgs,
+                tags=["arxiv:xxx", "image-generation", "1d-tokenizer", "128 tokens", "MAETok"], 
+                repo_url="https://github.com/Hhhhhhao/continuous_tokenizer", 
+                license="apache-2.0"):
         super().__init__(config)
         self.quantize = None 
 
 
     def encode(self, x):
+        
         h = self.encoder(x)
-        h = self.quant_conv(h)
-        return h
+        quant = self.quant_conv(h)
+        emb_loss = (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
+        info = None
+        return quant, emb_loss, info
 
-    def decode(self, z):
+    def decode(self, ):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
         return dec
 
-    def decode_code(self, z, shape=None):
-        dec = self.decode(z)
+    def decode(self, quant, x=None, h=None, w=None):
+        tmp_quant = quant 
+        quant = self.post_quant_conv(quant)
+        if self.use_movq:
+            dec = self.decoder(quant, tmp_quant, h, w)
+        else:
+            dec = self.decoder(quant, None, h, w)
         return dec
-
-    def forward(self, input):
-        z = self.encode(input)
-        dec = self.decode(z)
-        diff = (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
-        return dec, diff, None
 
 
 
@@ -313,7 +352,7 @@ def KL_16(**kwargs):
     return KLModel(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))
 
 def AE_16(**kwargs):
-    return AE(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))
+    return AEModel(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))
 
 def SoftVQ(**kwargs):
     return SoftVQModel(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))

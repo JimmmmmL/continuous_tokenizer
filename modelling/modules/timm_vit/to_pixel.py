@@ -43,9 +43,33 @@ class ToPixel(nn.Module):
         if to_pixel == 'linear':
             self.model = nn.Linear(in_dim, in_channels * patch_size * patch_size)
         elif to_pixel == 'conv':
+            num_patches_per_dim = img_size // patch_size  # e.g. 256//16 = 16
             self.model = nn.Sequential(
-                Rearrange('b (h w) c -> b c h w', h=img_size // patch_size),
-                nn.ConvTranspose2d(in_dim, in_channels, kernel_size=patch_size, stride=patch_size)
+                # (B, L, C) -> (B, C, H, W) with H = W = num_patches_per_dim
+                Rearrange('b (h w) c -> b c h w', h=num_patches_per_dim),
+                
+                # For example, first reduce dimension via a 1x1 conv from in_dim -> 128
+                nn.Conv2d(in_dim, 128, kernel_size=1, stride=1),
+                nn.ReLU(inplace=True),
+
+                # Upsample from size (num_patches_per_dim) to a larger intermediate
+                nn.Upsample(scale_factor=2, mode='nearest'),  
+                nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+
+                # Repeat upsampling until we reach the final resolution
+                # For a 16x16 patch layout, we need 4x upsampling to reach 256
+                #   16 -> 32 -> 64 -> 128 -> 256
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(16, in_channels, kernel_size=3, stride=1, padding=1),
             )
         elif to_pixel == 'siren':
             self.model = nn.Sequential(
@@ -63,7 +87,7 @@ class ToPixel(nn.Module):
         elif self.to_pixel_name == 'siren':
             return self.model[1].linear.weight
         elif self.to_pixel_name == 'conv':
-            return self.model[1].weight
+            return self.model[-1].weight
         else:
             return None
 
@@ -74,7 +98,7 @@ class ToPixel(nn.Module):
         """
         p = self.patch_size
         h = w = int(x.shape[1] ** .5)
-        assert h * w == x.shape[1]
+        assert h * w == x.shape[1], print(h, w, x.shape[1])
         x = x.reshape(shape=(x.shape[0], h, w, p, p, 3))
         x = torch.einsum('nhwpqc->nchpwq', x)
         imgs = x.reshape(shape=(x.shape[0], 3, h * p, h * p))

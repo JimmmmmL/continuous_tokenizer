@@ -3,6 +3,19 @@
 
 <div align="center">
 
+[![arXiv](https://img.shields.io/badge/arXiv%20paper-2410.01756-b31b1b.svg)](https://github.com/Hhhhhhao/continuous_tokenizer)&nbsp;
+[![huggingface models](https://img.shields.io/badge/%F0%9F%A4%97%20Weights-yellow)](https://huggingface.co/MAETok)&nbsp;
+
+</div>
+
+![Images generated with 128 tokens from autoencoder](assets/figure2.png)
+
+
+# SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer
+
+
+<div align="center">
+
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2410.01756-b31b1b.svg)](https://arxiv.org/abs/2412.10958v1)&nbsp;
 [![huggingface models](https://img.shields.io/badge/%F0%9F%A4%97%20Weights-yellow)](https://huggingface.co/SoftVQVAE)&nbsp;
 
@@ -12,6 +25,7 @@
 
 
 ## Change Logs
+* [02/05/2025] 512 and 256 SiT models and MAETok released. LightingDiT models will be updated and we will update the training scripts soon.
 * [12/19/2024] 512 SiT models and DiT models released. We also updated the training scripts.
 * [12/18/2024] All models have been released at: https://huggingface.co/SoftVQVAE. Checkout [demo](demo/sit.ipynb) here. 
 
@@ -26,7 +40,24 @@ pip install -r requirements.txt
 
 ## Models
 
-### Tokenizers
+### MAETok Tokenizers
+
+
+| Tokenizer 	| Image Size | rFID 	| Huggingface 	|
+|:---:	| :---:	| :---:	|:---:	|
+| MAETok-B-128 	| 256 | 0.48 	| [Model Weight](https://huggingface.co/MAETok/maetok-b-128) 	|
+| MAETok-B-128-512 	| 512 | 0.62 	| [Model Weight](https://huggingface.co/MAETok/maetok-b-512) 	|
+
+
+### SiT-XL Models on MAETok
+
+| Genenerative Model | Image Size	| Tokenizer 	| gFID (w/o CFG) |	gFID (w/ CFG)| Huggingface 	|
+|:---:	|:---:	|:---:	|:---:	|:---:	|:---:	|
+| SiT-XL 	| 256 | MAETok-B-128 	| 2.31 	| 1.67 | [Model Weight](https://huggingface.co/MAETok/sit-xl_maetok-b-128) 	|
+| SiT-XL 	| 512 | MAETok-B-128-512	| 2.79 	| 1.69 | [Model Weight](https://huggingface.co/MAETok/sit-xl_maetok-b-128-512) 	|
+
+
+### SoftVQ-VAE Tokenizers
 
 
 | Tokenizer 	| Image Size | rFID 	| Huggingface 	|
@@ -41,7 +72,7 @@ pip install -r requirements.txt
 | SoftVQ-L-32 	| 512 | 0.64 	| [Model Weight](https://huggingface.co/SoftVQVAE/softvq-l-32-512) 	|
 
 
-### SiT-XL Models
+### SiT-XL Models on SoftVQ-VAE 
 
 | Genenerative Model | Image Size	| Tokenizer 	| gFID (w/o CFG) |	gFID (w/ CFG)| Huggingface 	|
 |:---:	|:---:	|:---:	|:---:	|:---:	|:---:	|
@@ -54,7 +85,7 @@ pip install -r requirements.txt
 | SiT-XL 	| 512 | SoftVQ-BL-64 	| 7.96 	| 2.21 |[Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-bl-64-512) 	|
 | SiT-XL 	| 512 | SoftVQ-L-32 	| 10.97 	| 4.23 | [Model Weight](https://huggingface.co/SoftVQVAE/sit-xl_softvq-l-32-512) 	|
 
-### DiT-XL Models
+### DiT-XL Models on SoftVQ-VAE 
 
 | Genenerative Model | Image Size	| Tokenizer 	| gFID (w/o CFG) 	| gFID (w/ CFG) | Huggingface 	|
 |:---:	|:---:	|:---:	|:---:	|:---:	|:---:	|
@@ -90,12 +121,12 @@ torchrun --nproc_per_node=8 inference/reconstruct_vq.py --data-path ./ImageNet/v
 
 **SiT Generation**
 ```
-torchrun --nproc_per_node=8 inference/generate_sit.py --tf32 True --model SiT-XL/1 --cfg-scale 1.75 --path-type cosine --num-steps 250 --guidance-high 0.7 --vae-model softvq-l-64
+torchrun --nproc_per_node=8 inference/generate_sit.py --tf32 True --model SoftVQVAE/sit-xl_softvq-b-64 --cfg-scale 1.75 --path-type cosine --num-steps 250 --guidance-high 0.7 --vae-model softvq-l-64
 ```
 
 **DiT Generation**
 ```
-torchrun --nproc_per_node=8 inference/generate_dit.py --model DiT-XL/1 --cfg-scale 1.75 --noise-schedule cosine --num-sampling-steps 250 --vae-model softvq-l-64
+torchrun --nproc_per_node=8 inference/generate_dit.py --model SoftVQVAE/dit-xl_softvq-b-64--cfg-scale 1.75 --noise-schedule cosine --num-sampling-steps 250 --vae-model softvq-l-64
 ```
 
 
@@ -107,6 +138,13 @@ We use [ADM](https://github.com/openai/guided-diffusion/tree/main) evaluation to
 
 ## Reference
 ```
+@article{chen2024maetok,
+    title={Masked Autoencoders Are Effective Tokenizers for Diffusion Models},
+    author={Hao Chen and Yujin Han and Fangyi Chen and Xiang Li and Yidong Wang and Jindong Wang and Ze Wang and Zicheng Liu and Difan Zou and Bhiksha Raj},
+    journal={To be updated},
+    year={2025},
+}
+
 @article{chen2024softvqvae,
     title={SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer},
     author={Hao Chen and Ze Wang and Xiang Li and Ximeng Sun and Fangyi Chen and Jiang Liu and Jindong Wang and Bhiksha Raj and Zicheng Liu and Emad Barsoum},
