@@ -1,4 +1,4 @@
-# SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer
+# Masked Autoencoders Are Effective Tokenizers for Diffusion Models
 
 
 <div align="center">
