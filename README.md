@@ -3,7 +3,7 @@
 
 <div align="center">
 
-[![arXiv](https://img.shields.io/badge/arXiv%20paper-2412.10958-b31b1b.svg)](https://github.com/Hhhhhhao/continuous_tokenizer)&nbsp;
+[![arXiv](https://img.shields.io/badge/arXiv%20paper-2502.03444-b31b1b.svg)](https://github.com/Hhhhhhao/continuous_tokenizer)&nbsp;
 [![huggingface models](https://img.shields.io/badge/%F0%9F%A4%97%20Weights-yellow)](https://huggingface.co/MAETok)&nbsp;
 
 </div>
