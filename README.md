@@ -25,7 +25,7 @@
 
 
 ## Change Logs
-* [02/05/2025] 512 and 256 SiT models and MAETok released. LightingDiT models will be updated and we will update the training scripts soon. [256 SiT-XL checkpoint is wrong currently, will be updated soon.]
+* [02/05/2025] 512 and 256 SiT models and MAETok released. LightingDiT models will be updated and we will update the training scripts soon.
 * [12/19/2024] 512 SiT models and DiT models released. We also updated the training scripts.
 * [12/18/2024] All models have been released at: https://huggingface.co/SoftVQVAE. Checkout [demo](demo/sit.ipynb) here. 
 
