@@ -133,7 +133,27 @@ class TimmViTEncoder(nn.Module):
     def no_weight_decay(self):
         return ['model.pos_embed', 'model.cls_token', 'model.dist_token', 'latent_tokens', 'latent_pos_embed', 'freqs']
 
-    def forward(self, x):
+    def sample_orders(self, bsz, seq_len):
+        # generate a batch of random generation orders
+        orders = []
+        for _ in range(bsz):
+            order = np.array(list(range(seq_len)))
+            np.random.shuffle(order)
+            orders.append(order)
+        orders = torch.Tensor(np.array(orders)).long()
+        return orders
+
+    def random_masking(self, x, orders):
+        # generate token mask
+        bsz, seq_len, embed_dim = x.shape
+        mask_rate = self.mask_ratio_generator.rvs(1)[0]
+        num_masked_tokens = int(np.ceil(seq_len * mask_rate))
+        mask = torch.zeros(bsz, seq_len, device=x.device)
+        mask = torch.scatter(mask, dim=-1, index=orders[:, :num_masked_tokens],
+                             src=torch.ones(bsz, seq_len, device=x.device))
+        return mask
+
+    def forward(self, x, return_mask=False):
 
         # get tokens
         _, _, H, W = x.shape
@@ -143,7 +163,8 @@ class TimmViTEncoder(nn.Module):
             orders = self.sample_orders(bsz=x.size(0), seq_len=x.size(1)).to(x.device)
             mask = self.random_masking(x, orders).unsqueeze(-1)
             x = torch.where(mask.bool(), self.mask_token, x)
-        
+        else:
+            mask = None 
         
         if not 'eva02' in self.model_name:
             x = self.model._pos_embed(x)
@@ -196,8 +217,10 @@ class TimmViTEncoder(nn.Module):
             # get img tokens as out
             out = x[:, self.num_prefix_tokens:]
         
-
-        return out
+        if return_mask:
+            return out, mask
+        else:
+            return out
 
 
 class TimmViTDecoder(nn.Module):
@@ -214,6 +237,7 @@ class TimmViTDecoder(nn.Module):
         super().__init__()
 
         # model_kwargs['num_latent_tokens'] = num_latent_tokens
+        # model_kwargs['class_token'] = cls_token
         model = create_model(
             model_name,
             pretrained=pretrained,
@@ -311,6 +335,7 @@ class TimmViTDecoder(nn.Module):
         if not cls_token:
             self.model.cls_token = None
             self.num_prefix_tokens -= 1
+            self.model.num_prefix_tokens -= 1
             
     def no_weight_decay(self):
         return ['model.pos_embed', 'model.cls_token', 'model.dist_token', 'mask_token', 'latent_pos_embed', 'freqs']

@@ -656,6 +656,8 @@ class VisionTransformer(nn.Module):
         self.no_embed_class = no_embed_class  # don't embed prefix positions (includes reg)
         self.dynamic_img_size = dynamic_img_size
         self.grad_checkpointing = False
+        self.patch_size = patch_size
+        self.img_size = img_size
 
         embed_args = {}
         if dynamic_img_size:
@@ -935,7 +937,10 @@ class VisionTransformer(nn.Module):
         )
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        B, _, height, width = x.shape
         x = self.patch_embed(x)
+        if self.dynamic_img_size:
+            x = x.reshape(B, height // self.patch_size, width // self.patch_size, x.shape[-1])
         x = self._pos_embed(x)
         x = self.patch_drop(x)
         x = self.norm_pre(x)
@@ -2184,6 +2189,16 @@ def vit_tiny_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransforme
     """
     model_args = dict(patch_size=16, embed_dim=192, depth=12, num_heads=3)
     model = _create_vision_transformer('vit_tiny_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+
+@register_model
+def vit_tinytiny_patch14_dinov2_movq2(pretrained: bool = False, **kwargs) -> VisionTransformer:
+    """ ViT-S/14 for DINOv2
+    """
+    model_args = dict(patch_size=14, embed_dim=192, depth=3, num_heads=3, init_values=1e-5, block_fn=MoVQBlockv2)
+    model = _create_vision_transformer(
+        'vit_tiny_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 
 

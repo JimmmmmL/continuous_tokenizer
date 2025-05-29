@@ -1,4 +1,4 @@
-# Masked Autoencoders Are Effective Tokenizers for Diffusion Models
+# [ICML25 Spotlight] Masked Autoencoders Are Effective Tokenizers for Diffusion Models
 
 
 <div align="center">
@@ -11,7 +11,7 @@
 ![Images generated with 128 tokens from autoencoder](assets/figure2.png)
 
 
-# SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer
+# [CVPR25] SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer
 
 
 <div align="center">
@@ -25,6 +25,7 @@
 
 
 ## Change Logs
+* [05/28/2025] Training code of MAETok released. 
 * [02/05/2025] 512 and 256 SiT models and MAETok released. LightingDiT models will be updated and we will update the training scripts soon.
 * [12/19/2024] 512 SiT models and DiT models released. We also updated the training scripts.
 * [12/18/2024] All models have been released at: https://huggingface.co/SoftVQVAE. Checkout [demo](demo/sit.ipynb) here. 
@@ -131,25 +132,33 @@ torchrun --nproc_per_node=8 inference/generate_dit.py --model SoftVQVAE/dit-xl_s
 
 
 **Evaluation**
-
 We use [ADM](https://github.com/openai/guided-diffusion/tree/main) evaluation toolkit to compute the FID/IS of generated samples
+
+
+**GMM Fitting**
+```
+# save training latent first
+torchrun --nproc_per_node=8 inference/cache_latent.py --dataset imagenet --data-path imagenet/train --sample-dir saved_latent --vae-name maetok-b-128
+# run gmm
+python inference/gmm_fit.py --use_gpu 0 --exp  maetok-b-128 --n_iter 500 --samples_per_class 100 --components 5 10 50 100 200 300
+```
 
 
 
 ## Reference
 ```
-@article{chen2024maetok,
+@inproceedings{chen2025maetok,
     title={Masked Autoencoders Are Effective Tokenizers for Diffusion Models},
     author={Hao Chen and Yujin Han and Fangyi Chen and Xiang Li and Yidong Wang and Jindong Wang and Ze Wang and Zicheng Liu and Difan Zou and Bhiksha Raj},
-    journal={To be updated},
+    booktitle={ICML},
     year={2025},
 }
 
-@article{chen2024softvqvae,
+@inproceedings{chen2025softvqvae,
     title={SoftVQ-VAE: Efficient 1-Dimensional Continuous Tokenizer},
     author={Hao Chen and Ze Wang and Xiang Li and Ximeng Sun and Fangyi Chen and Jiang Liu and Jindong Wang and Bhiksha Raj and Zicheng Liu and Emad Barsoum},
-    journal={arXiv preprint arXiv:2412.10958},
-    year={2024},
+    booktitle={CVPR},
+    year={2025},
 }
 ```
 

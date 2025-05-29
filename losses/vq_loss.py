@@ -197,27 +197,43 @@ class VQLoss(nn.Module):
                 # repa loss
                 loss += codebook_loss[4]
             
+            if len(codebook_loss) > 5:
+                # other deciders loss
+                for item in codebook_loss[5:]:
+                    loss += item
+            
             if global_step % log_every == 0:
                 rec_loss = self.rec_weight * rec_loss
                 p_loss = perceptual_weight * p_loss
                 generator_adv_loss = disc_adaptive_weight * disc_weight * generator_adv_loss
                 repa_loss = codebook_loss[4] if len(codebook_loss) > 4 else 0.0
-                logger.info(f"(Generator) rec_loss: {rec_loss:.4f}, perceptual_loss: {p_loss:.4f}, "
-                            f"vq_loss: {codebook_loss[0]:.4f}, commit_loss: {codebook_loss[1]:.4f}, entropy_loss: {codebook_loss[2]:.4f}, repa_loss: {repa_loss:.4f}, "
-                            f"codebook_usage: {codebook_loss[3]:.4f}, generator_adv_loss: {generator_adv_loss:.4f}, "
-                            f"disc_adaptive_weight: {disc_adaptive_weight:.4f}, disc_weight: {disc_weight:.4f}")
+
+                logger_string = f"(Generator) rec_loss: {rec_loss:.4f}, perceptual_loss: {p_loss:.4f}, " \
+                                f"vq_loss: {codebook_loss[0]:.4f}, commit_loss: {codebook_loss[1]:.4f}, entropy_loss: {codebook_loss[2]:.4f}, repa_loss: {repa_loss:.4f}, " \
+                                f"codebook_usage: {codebook_loss[3]:.4f}, generator_adv_loss: {generator_adv_loss:.4f}, " \
+                                f"disc_adaptive_weight: {disc_adaptive_weight:.4f}, disc_weight: {disc_weight:.4f}"
+                if len(codebook_loss) > 5:
+                    for i in range(5, len(codebook_loss)):
+                        logger_string += f", decoder {i:d}: {codebook_loss[i]:.4f}"
+                logger.info(logger_string)
+                
                 if tdist.get_rank() == 0 and self.wandb_logger is not None:
-                    self.wandb_logger.log({
+                    log_dict = {
                         "rec_loss": rec_loss,
                         "perceptual_loss": p_loss,
                         'repa_loss': repa_loss,
                         "codebook_loss": codebook_loss[0],
-                        "codebook_usage": codebook_loss[3],
+                        # "codebook_usage": codebook_loss[3],
                         "generator_adv_loss": generator_adv_loss,
                         "disc_adaptive_weight": disc_adaptive_weight,
                         "disc_weight": disc_weight,
-                    },
-                    step=global_step)
+                        'codebook_usage': codebook_loss[3],
+                    }
+                    if len(codebook_loss) > 5:
+                        for i in range(5, len(codebook_loss)):
+                            log_dict[f"decoder_{i}"] = codebook_loss[i]
+                    self.wandb_logger.log(log_dict, step=global_step)
+                    
             return loss
 
         # discriminator update

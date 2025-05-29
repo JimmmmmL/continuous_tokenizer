@@ -128,6 +128,18 @@ def main(args):
         repa_loss_weight=args.repa_loss_weight,
         repa_align=args.repa_align,
         num_codebooks=args.num_codebooks,
+        # encoder mask modeling
+        enc_token_drop=args.enc_token_drop,
+        enc_token_drop_max=args.enc_token_drop_max,
+        # aux decoder model
+        aux_dec_model=args.aux_decoder_model,
+        aux_loss_mask=args.aux_loss_mask,
+        aux_hog_dec=args.aux_hog_decoder,
+        aux_dino_dec=args.aux_dino_decoder,
+        aux_clip_dec=args.aux_clip_decoder,
+        aux_supcls_dec=args.aux_supcls_decoder,
+        # to pixel
+        to_pixel=args.to_pixel,
     )
     logger.info(f"VQ Model Parameters: {sum(p.numel() for p in vq_model.parameters() if p.requires_grad):,}")
     if args.ema:
@@ -473,6 +485,7 @@ if __name__ == "__main__":
     parser.add_argument("--decoder-pretrained", type=str2bool, default=False, help='load pre-trained weight for decoder')
     parser.add_argument("--encoder-patch-size", type=int, default=16, help='encoder patch size')
     parser.add_argument("--decoder-patch-size", type=int, default=16, help='decoder patch size')
+    parser.add_argument("--to-pixel", type=str, default="linear")
     
     # repa
     parser.add_argument("--repa", type=str2bool, default=False, help='use repa')
@@ -481,6 +494,20 @@ if __name__ == "__main__":
     parser.add_argument('--repa-proj-dim', type=int, default=1024, help='repa embed dim')
     parser.add_argument('--repa-loss-weight', type=float, default=0.1, help='repa loss weight')
     parser.add_argument('--repa-align', type=str, default='global', help='align repa feature', choices=['global', 'avg_1d', 'avg_2d', 'avg_1d_shuffle'])
+    
+    # aux decoder
+    parser.add_argument("--aux-decoder-model", type=str, default='vit_tiny_patch14_dinov2_movq', help='aux decoder model name')
+    parser.add_argument("--aux-loss-mask", type=str2bool, default='False', help='compute loss only at mask region')
+    parser.add_argument("--aux-hog-decoder", type=str2bool, default=True, help='aux decoder hog decoder')
+    parser.add_argument("--aux-dino-decoder", type=str2bool, default=True, help='aux decoder dino decoder')
+    parser.add_argument("--aux-clip-decoder", type=str2bool, default=True, help='aux decoder hog decoder')
+    parser.add_argument("--aux-supcls-decoder", type=str2bool, default=True, help='aux decoder hog decoder')
+    
+    # mask modeling
+    # make sure drop is 0.0 for not using mask modeling
+    parser.add_argument("--enc-token-drop", type=float, default=0.0, help='encoder token drop')
+    parser.add_argument("--enc-token-drop-max", type=float, default=0.75, help='maximum drop rate')
+    
   
     #fFirst parse of command-line args to check for config file
     args = parser.parse_args()
