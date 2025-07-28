@@ -11,7 +11,7 @@ no_local_save: True
 
 
 dataset: imagenet
-data_path: ./ImageNet/train
+data_path: ../../shared/train/ # Change it to your actual imagenet path
 image_size: 256
 
 vq_model: MaskAE-16

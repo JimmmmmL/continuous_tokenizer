@@ -87,7 +87,7 @@ def main(args):
             file_yaml = yaml.YAML()
             file_yaml.dump(experiment_config, f)
         
-        wandb_logger = wandb.init(project='tokenizer', name=f'exp{experiment_index:03d}-{model_string_name}')
+        wandb_logger = wandb.init(project='maetok', name=f'exp{experiment_index:03d}-{model_string_name}')
     else:
         logger = create_logger(None)
         wandb_logger = None
@@ -304,7 +304,7 @@ def main(args):
 
             # generator training
             optimizer.zero_grad()
-            with torch.cuda.amp.autocast(dtype=ptdtype):  
+            with torch.amp.autocast("cuda", dtype=ptdtype):  
                 recons_imgs, codebook_loss, info = vq_model(imgs)
                 loss_gen = vq_loss(codebook_loss, imgs, recons_imgs, optimizer_idx=0, global_step=train_steps+1, 
                                    last_layer=vq_model.module.decoder.last_layer, 
@@ -320,7 +320,7 @@ def main(args):
 
             # discriminator training            
             optimizer_disc.zero_grad()
-            with torch.cuda.amp.autocast(dtype=ptdtype):
+            with torch.amp.autocast("cuda", dtype=ptdtype):
                 loss_disc = vq_loss(codebook_loss, imgs, recons_imgs, optimizer_idx=1, global_step=train_steps+1,
                                     logger=logger, log_every=args.log_every)
             scaler_disc.scale(loss_disc).backward()
