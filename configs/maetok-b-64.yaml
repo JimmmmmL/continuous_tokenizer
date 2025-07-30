@@ -11,7 +11,7 @@ no_local_save: True
 
 
 dataset: imagenet
-data_path: ../../shared/train/ # Change it to your actual imagenet path
+data_path: /vast/hl3797/imagenet-subset/train # Change it to your actual imagenet path
 image_size: 256
 
 vq_model: MaskAE-16
@@ -68,7 +68,7 @@ repa_loss_weight: 0.1
 repa_align: repeat
 
 epochs: 200
-lr: 1.0e-4
+lr: 5e-5
 lr_warmup_epochs: 2
 optim: adamw
 lr_scheduler: cosine
@@ -76,7 +76,7 @@ weight_decay: 0.0001
 beta1: 0.9
 beta2: 0.95
 max_grad_norm: 1.0
-global_batch_size: 512
+global_batch_size: 256
 
 
 

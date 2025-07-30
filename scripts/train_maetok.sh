@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,2,3,5 torchrun --nproc_per_node=4 train/train_tokenizer.py --config /data1/jl14087/continuous_tokenizer/configs/maetok-b-64.yaml
+torchrun --nproc_per_node=4 train/train_tokenizer.py --config ./configs/maetok-b-64.yaml

@@ -175,3 +175,11 @@ cython_debug/
 
 wandb/
 experiments/
+
+*.lock
+*.slurm
+*.out
+version.txt
+
+*.safetensors
+cache/
