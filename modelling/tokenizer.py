@@ -13,7 +13,7 @@ from modelling.modules import Encoder, Decoder, TimmViTEncoder, TimmViTDecoder
 from modelling.quantizers.vq import VectorQuantizer
 from modelling.quantizers.kl import DiagonalGaussianDistribution
 from modelling.quantizers.softvq import SoftVectorQuantizer
-
+from modelling.simple_ae import SimpleAE
 from timm import create_model
 
 
@@ -571,6 +571,8 @@ def MaskAE_16(**kwargs):
 def SoftVQ(**kwargs):
     return SoftVQModel(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))
 
+def SimpleAE_16(**kwargs):
+    return SimpleAE(ModelArgs(encoder_ch_mult=[1, 1, 2, 2, 4], decoder_ch_mult=[1, 1, 2, 2, 4], **kwargs))
 
 VQ_models = {
     'AE-16': AE_16,
@@ -578,7 +580,8 @@ VQ_models = {
     'VQ-16': VQ_16, 'VQ-8': VQ_8,
     'KL-16': KL_16, 'KL-8': KL_8,
     'SoftVQ': SoftVQ,
-    }
+    'SimpleAE-16': SimpleAE_16
+}
 
 
 if __name__ == '__main__':

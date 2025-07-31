@@ -1,0 +1,1 @@
+torchrun --nproc_per_node=2 train/train_tokenizer_vanilla.py --config ./configs/simple_mae.yaml

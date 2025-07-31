@@ -57,7 +57,7 @@ class TimmViTEncoder(nn.Module):
 
         self.img_size = model_kwargs['img_size']
         self.patch_size = model_kwargs['patch_size']
-        self.embed_dim = model.embed_dim
+        self.embed_dim = model.embed_dim # 384
         # get num of img tokens
         self.num_img_tokens = model.patch_embed.num_patches
         self.num_prefix_tokens = model.num_prefix_tokens
@@ -157,7 +157,7 @@ class TimmViTEncoder(nn.Module):
 
         # get tokens
         _, _, H, W = x.shape
-        x = self.model.patch_embed(x)
+        x = self.model.patch_embed(x) # 1, 256, 384
 
         if self.token_drop and self.training:
             orders = self.sample_orders(bsz=x.size(0), seq_len=x.size(1)).to(x.device)
@@ -167,23 +167,25 @@ class TimmViTEncoder(nn.Module):
             mask = None 
         
         if not 'eva02' in self.model_name:
-            x = self.model._pos_embed(x)
-            x = self.model.patch_drop(x)
+            x = self.model._pos_embed(x) # 1, 257, 384
+            x = self.model.patch_drop(x) # 1, 257, 384
+  
         else:
             x, _ = self.model._pos_embed(x)
 
         if self.num_latent_tokens:
             # insert latent tokens
             z = self.latent_tokens.expand(x.size(0), -1, -1)
-            x = torch.cat([x, z + self.latent_pos_embed], dim=1)
+            x = torch.cat([x, z + self.latent_pos_embed], dim=1) # 1, 321, 384
+
+        
             
         # pre layer norm
         if not 'eva02' in self.model_name:
-            x = self.model.norm_pre(x)
-            
+            x = self.model.norm_pre(x) # 1, 321, 384
         if self.use_ape: 
             for i, blk in enumerate(self.model.blocks):
-                x = blk(x)
+                x = blk(x) # 1, 321, 384
         elif self.rope_mixed and self.use_rope:
             if self.freqs_t_x.shape[0] != x.shape[1] - self.num_prefix_tokens - self.num_latent_tokens:
                 t_x, t_y = init_t_xy(end_x = W // self.patch_size, end_y = H // self.patch_size)
@@ -215,8 +217,7 @@ class TimmViTEncoder(nn.Module):
             out = x[:, -self.num_latent_tokens:]
         else:
             # get img tokens as out
-            out = x[:, self.num_prefix_tokens:]
-        
+            out = x[:, self.num_prefix_tokens:] # 1, 64, 384
         if return_mask:
             return out, mask
         else:
@@ -418,11 +419,11 @@ class TimmViTDecoder(nn.Module):
 
 
 if __name__ == '__main__':
-    encoder = TimmViTEncoder(num_latent_tokens=256)
-    decoder = TimmViTDecoder(num_latent_tokens=256)
+    encoder = TimmViTEncoder(num_latent_tokens=64)
+    decoder = TimmViTDecoder(num_latent_tokens=64)
     
     x = torch.randn(1, 3, 224, 224)
     
     o = encoder(x)
-    print(o.shape)
+    print(o.shape) # torch.Size([1, 64, 384])
     r = decoder(o)
