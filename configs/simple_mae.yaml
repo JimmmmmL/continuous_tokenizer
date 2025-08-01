@@ -11,7 +11,7 @@ no_local_save: True
 
 
 dataset: imagenet
-data_path: ../../shared/train/ # Change it to your actual imagenet path
+data_path: /vast/hl3797/imagenet-subset/train # Change it to your actual imagenet path
 image_size: 256
 
 vq_model: SimpleAE-16
