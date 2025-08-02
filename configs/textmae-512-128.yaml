@@ -1,0 +1,54 @@
+ngpus: 2
+
+results_dir: experiments/tokenizer
+cloud_save_path: experiments/tokenizer
+compile: False
+global_seed: 42
+log_every: 50
+vis_every: 5000
+ckpt_every: 10000
+mixed_precision: bf16
+save_best: True
+
+
+dataset: wikitext103
+cache_dir: ./cache/
+
+vq_model: TextMAE-512
+ema: True 
+
+# B * 512 -> B * 128 * 32
+num_latent_tokens: 128
+codebook_embed_dim: 32
+vocab_size: 50257
+max_seq_len: 512
+
+encoder_pretrained: True
+encoder_tuning_method: full
+bert_model_name: 'bert-base-uncased'
+decoder_pretrained: True
+decoder_tuning_method: full
+
+use_masked_modeling: True
+token_drop_rate: 0.4
+token_drop_rate_max: 0.6
+
+num_decoder_layers: 12
+
+epochs: 200
+lr: 1e-4
+lr_warmup_epochs: 2
+optim: adamw
+lr_scheduler: cosine
+weight_decay: 0.0001
+beta1: 0.9
+beta2: 0.95
+max_grad_norm: 1.0
+global_batch_size: 64
+eval_batch_size: 8
+gradient_accumulation_steps: 1
+
+vq_ckpt: 
+finetune: False
+
+

@@ -2,8 +2,6 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
-import sys
-sys.path.append("/data1/jl14087/continuous_tokenizer")
 from modelling.modules.bert_mae_models import TextMAEEncoder, TextMAEDecoder
 
 @dataclass
@@ -26,8 +24,11 @@ class TextMAEArgs:
     token_drop_rate: float = 0.4  # Minimum mask rate
     token_drop_rate_max: float = 0.6  # Maximum mask rate
 
+    # --- Encoder Config ---
+    encoder_tuning_method: str = 'full'  # Options: 'full', 'partial', 'none'
     # --- Decoder Config ---
     num_decoder_layers: int = 12
+    decoder_tuning_method: str = 'full'  # Options: 'full', 'partial', 'none'
     
 
 class TextMAE(nn.Module):
@@ -46,7 +47,7 @@ class TextMAE(nn.Module):
             num_latent_tokens=config.num_latent_tokens,
             model_name=config.bert_model_name,
             pretrained=config.enc_pretrained,
-            tuning_method='full',
+            tuning_method=config.encoder_tuning_method,
             token_drop=config.token_drop_rate,
             token_drop_max=config.token_drop_rate_max,
         )
@@ -65,6 +66,7 @@ class TextMAE(nn.Module):
             model_name=config.bert_model_name,
             num_decoder_layers=config.num_decoder_layers,
             pretrained=config.dec_pretrained,
+            tuning_method=config.decoder_tuning_method,
         )
 
         # Ensure post_quant_conv output dimension matches decoder's expected input dimension

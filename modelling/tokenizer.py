@@ -14,6 +14,7 @@ from modelling.quantizers.vq import VectorQuantizer
 from modelling.quantizers.kl import DiagonalGaussianDistribution
 from modelling.quantizers.softvq import SoftVectorQuantizer
 from modelling.simple_ae import SimpleAE
+
 from timm import create_model
 
 
