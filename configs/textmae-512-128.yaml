@@ -12,7 +12,7 @@ save_best: True
 
 
 dataset: wikitext103
-cache_dir: ./cache/
+cache_dir: ./data_cache/
 
 vq_model: TextMAE-512
 ema: True 
@@ -44,7 +44,7 @@ weight_decay: 0.0001
 beta1: 0.9
 beta2: 0.95
 max_grad_norm: 1.0
-global_batch_size: 64
+global_batch_size: 128
 eval_batch_size: 8
 gradient_accumulation_steps: 1
 

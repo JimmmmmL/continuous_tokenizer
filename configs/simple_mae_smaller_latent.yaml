@@ -14,25 +14,11 @@ dataset: imagenet
 data_path: /vast/hl3797/imagenet-subset/train # Change it to your actual imagenet path
 image_size: 256
 
-vq_model: AE-16
+vq_model: SimpleAE-16
 ema: True 
 
-num_latent_tokens: 128
+num_latent_tokens: 32
 codebook_embed_dim: 32
-entropy_loss_ratio: 0.0
-
-reconstruction_weight: 1.0
-perceptual_weight: 1.0
-perceptual_warmup: 10000
-disc_weight: 0.4
-disc_adaptive_weight: True
-use_diff_aug: True 
-disc_cr_loss_weight: 4.0
-disc_start: 30000
-disc_type: dino
-disc_loss: hinge
-gen_loss: hinge
-lecam_loss_weight: 0.001
 
 enc_type: vit
 encoder_model: vit_base_patch14_dinov2.lvd142m
@@ -55,7 +41,6 @@ rope_theta: 10.0
 enc_token_drop: 0.4
 enc_token_drop_max: 0.6
 
-repa: False
 epochs: 200
 lr: 2.5e-5
 lr_warmup_epochs: 2
@@ -65,7 +50,7 @@ weight_decay: 0.0001
 beta1: 0.9
 beta2: 0.95
 max_grad_norm: 1.0
-global_batch_size: 128
+global_batch_size: 128 # 512
 
 
 

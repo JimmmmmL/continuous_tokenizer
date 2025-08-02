@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 train/train_tokenizer_text.py --config ./configs/textmae-512-128.yaml
+torchrun --nproc_per_node=2 train/train_tokenizer_text.py --config ./configs/textmae-512-128.yaml

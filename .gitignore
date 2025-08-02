@@ -183,3 +183,4 @@ version.txt
 
 *.safetensors
 cache/
+data_cache/
