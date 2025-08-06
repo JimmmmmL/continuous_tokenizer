@@ -253,6 +253,7 @@ class DiT(nn.Module, PyTorchModelHubMixin):
         self.num_heads = num_heads
         self.vae_1d = vae_1d
         
+        ## TODO: 
         if self.vae_1d:
             self.x_embedder = nn.Linear(in_channels, hidden_size)
             num_patches = input_size
@@ -287,6 +288,7 @@ class DiT(nn.Module, PyTorchModelHubMixin):
         if not self.vae_1d:
             pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.x_embedder.num_patches ** 0.5))
         else:
+            # TODO:
             pos_embed = positionalencoding1d(self.pos_embed.shape[-1], self.pos_embed.shape[-2])
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         # nn.init.normal_(self.pos_embed, std=0.02)
@@ -297,6 +299,7 @@ class DiT(nn.Module, PyTorchModelHubMixin):
             nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
             nn.init.constant_(self.x_embedder.proj.bias, 0)
         else:
+            # TODO
             w = self.x_embedder.weight.data
             nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
             nn.init.constant_(self.x_embedder.bias, 0)
@@ -341,8 +344,8 @@ class DiT(nn.Module, PyTorchModelHubMixin):
         t: (N,) tensor of diffusion timesteps
         y: (N,) tensor of class labels
         """
-        
-        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        x = self.x_embedder(x) + self.pos_embed  # (N, T, D)
+
         N, T, D = x.shape
         
         t = self.t_embedder(t)                   # (N, D)
@@ -352,6 +355,7 @@ class DiT(nn.Module, PyTorchModelHubMixin):
             x = block(x, c)                      # (N, T, D)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         if not self.vae_1d:
+            # TODO
             x = self.unpatchify(x)                   # (N, out_channels, H, W)
             
         # x = self.unpatchify(x)                   # (N, out_channels, H, W)
@@ -374,12 +378,14 @@ class DiT(nn.Module, PyTorchModelHubMixin):
         if not self.vae_1d:
             eps, rest = model_out[:, :self.in_channels], model_out[:, self.in_channels:]
         else:
+            # TODO
             eps, rest = model_out[:, :, :self.in_channels], model_out[:, :, self.in_channels:]
         # eps, rest = model_out[:, :3], model_out[:, 3:]
         cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
         half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
         eps = torch.cat([half_eps, half_eps], dim=0)
         if not self.vae_1d:
+            # TODO:
             model_out = torch.cat([eps, rest], dim=1)
             return model_out
         else:

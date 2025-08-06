@@ -28,7 +28,7 @@ from utils.ema import update_ema, requires_grad
 from utils.misc import str2bool, manage_checkpoints, load_model_state_dict
 from utils.optim import param_groups_weight_decay
 from utils.data_text import get_dataloaders
-from modelling.text_tokenizer import VQ_models
+from modelling.bert_mae import TextMAE, TextMAEArgs
 from transformers import GPT2TokenizerFast
 
 import warnings
@@ -117,20 +117,18 @@ def main(args):
     logger.info(f"Starting rank={rank}, seed={seed}, world_size={dist.get_world_size()}.")
 
     # create and load model
-    vq_model = VQ_models[args.vq_model](
-        bert_model_name = args.bert_model_name,
-        vocab_size=args.vocab_size,
-        max_seq_len=args.max_seq_len,
-        codebook_embed_dim=args.codebook_embed_dim,
-        num_latent_tokens=args.num_latent_tokens,
-        enc_pretrained=args.encoder_pretrained,
-        dec_pretrained=args.decoder_pretrained,
-        encoder_tuning_method=args.encoder_tuning_method,
-        decoder_tuning_method=args.decoder_tuning_method,
-        use_masked_modeling=args.use_masked_modeling,
-        token_drop_rate=args.token_drop_rate,
-        token_drop_rate_max=args.token_drop_rate_max,
-        num_decoder_layers=args.num_decoder_layers
+    vq_model = TextMAE(
+        config=TextMAEArgs(
+            vocab_size=args.vocab_size,
+            max_seq_len=args.max_seq_len,
+            num_latent_tokens=args.num_latent_tokens,
+            codebook_embed_dim=args.codebook_embed_dim,
+            num_layers=args.num_layers,
+            num_heads=args.num_heads,
+            width=args.width,
+            token_drop_rate=args.token_drop_rate,
+            token_drop_rate_max=args.token_drop_rate_max,
+        )
     )
     logger.info(f"VQ Model Parameters: {sum(p.numel() for p in vq_model.parameters() if p.requires_grad):,}")
     if args.ema:
@@ -368,7 +366,6 @@ if __name__ == "__main__":
     parser.add_argument("--exp-index", type=str, default=None, help="experiment index")
     parser.add_argument("--dataset", type=str, default="wikitext103", help="dataset to use for training")
     parser.add_argument("--cloud-save-path", type=str, help='please specify a cloud disk path, if not, local path')
-    parser.add_argument("--vq-model", type=str, choices=list(VQ_models.keys()), default="TextMAE")
     parser.add_argument("--vq-ckpt", type=str, default=None, help="ckpt path for resume training")
     parser.add_argument("--ema", type=str2bool, default=True, help="whether using ema training")
     parser.add_argument("--codebook-embed-dim", type=int, default=32, help="codebook dimension for vector quantization")
@@ -397,20 +394,15 @@ if __name__ == "__main__":
     parser.add_argument("--num-latent-tokens", type=int, default=128)
     parser.add_argument("--vocab-size", type=int, default=50257, help="vocab size for text tokenizer")
     parser.add_argument("--max-seq-len", type=int, default=512, help="maximum sequence length for text tokenizer")
-    parser.add_argument("--encoder-pretrained", type=str2bool, default=True, help="load pre-trained weight for encoder")
-    parser.add_argument("--decoder-pretrained", type=str2bool, default=True, help="load pre-trained weight for decoder")
-    parser.add_argument("--encoder-tuning-method", type=str, default='full', help='tuning method for encoder', choices=['full', 'lora', 'frozen'])
-    parser.add_argument("--decoder-tuning-method", type=str, default='full', help='tuning method for decoder', choices=['full', 'lora', 'frozen'])
-    
-    parser.add_argument("--bert-model-name", type=str, default='bert-base-uncased', help="pre-trained BERT model name")
+    parser.add_argument("--num_layers", type=int, default=12, help="number of layers/blocks in the encoder/decoder")
+    parser.add_argument("--num-heads", type=int, default=12, help="number of attention heads in the encoder/decoder")
+    parser.add_argument("--width", type=int, default=768, help="hidden dimension of the encoder/decoder")
+
     
     # mask modeling
     # make sure drop is 0.0 for not using mask modeling
-    parser.add_argument("--use-masked-modeling", type=str2bool, default=True, help="whether to use masked modeling")
     parser.add_argument("--token-drop-rate", type=float, default=0.4, help='encoder token drop')
     parser.add_argument("--token-drop-rate-max", type=float, default=0.6, help='maximum drop rate')
-
-    parser.add_argument("--num-decoder-layers", type=int, default=12, help="number of decoder layers")
 
     # Evaluation
     parser.add_argument("--eval-batch-size", type=int, default=8, help="batch size for evaluation")

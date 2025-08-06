@@ -6,48 +6,66 @@ from einops import rearrange
 
 # We need the transformers library for BERT and peft for LoRA
 # pip install transformers peft accelerate
-from transformers import AutoModel, AutoConfig
 import peft
+from collections import OrderedDict
 
-# Note: The original RoPE helper functions are not needed as we rely on BERT's
-# native positional embeddings. I've removed them for clarity.
+def modulate(x, shift, scale):
+    return x * (1 + scale) + shift
 
-def extend_positional_embeddings(model, new_max_length):
-    """
-    Extends the positional embeddings of a BERT-like model to a new maximum length.
-    """
-    # Get the original embedding layer and its properties
-    original_embeddings = model.embeddings.position_embeddings
-    original_max_length = original_embeddings.num_embeddings
-    embedding_dim = original_embeddings.embedding_dim
 
-    if new_max_length <= original_max_length:
-        print(f"New length {new_max_length} is not greater than original {original_max_length}. No changes made.")
-        return model
+class ResidualAttentionBlock(nn.Module):
+    def __init__(
+            self,
+            d_model,
+            n_head,
+            mlp_ratio = 4.0,
+            act_layer = nn.GELU,
+            norm_layer = nn.LayerNorm
+        ):
+        super().__init__()
 
-    # Create a new embedding layer with the new size
-    new_embeddings = nn.Embedding(new_max_length, embedding_dim)
-    # Initialize with the same device and dtype
-    new_embeddings.to(original_embeddings.weight.device, dtype=original_embeddings.weight.dtype)
-    
-    # Copy the old weights into the new layer
-    new_embeddings.weight.data[:original_max_length, :] = original_embeddings.weight.data
-    
-    # Initialize the new positional embeddings (positions > original_max_length)
-    # A common practice is to just initialize them like the original model did.
-    # We can copy the initialization from the last few existing vectors as a simple heuristic
-    # or just let them be randomly initialized as per nn.Embedding default.
-    # For fine-tuning, random initialization is usually sufficient.
-    # Here, we will let them be randomly initialized by default.
-    
-    # Replace the old layer with the new one
-    model.embeddings.position_embeddings = new_embeddings
-    
-    # Update the model's config to reflect the change
-    model.config.max_position_embeddings = new_max_length
-    
-    print(f"Resized positional embeddings from {original_max_length} to {new_max_length}")
-    return model
+        self.ln_1 = norm_layer(d_model)
+        self.attn = nn.MultiheadAttention(d_model, n_head)
+        self.mlp_ratio = mlp_ratio
+        # optionally we can disable the FFN
+        if mlp_ratio > 0:
+            self.ln_2 = norm_layer(d_model)
+            mlp_width = int(d_model * mlp_ratio)
+            self.mlp = nn.Sequential(OrderedDict([
+                ("c_fc", nn.Linear(d_model, mlp_width)),
+                ("gelu", act_layer()),
+                ("c_proj", nn.Linear(mlp_width, d_model))
+            ]))
+
+    def attention(
+            self,
+            x: torch.Tensor
+    ):
+        return self.attn(x, x, x, need_weights=False)[0]
+
+    def forward(
+            self,
+            x: torch.Tensor,
+    ):
+        attn_output = self.attention(x=self.ln_1(x))
+        x = x + attn_output
+        if self.mlp_ratio > 0:
+            x = x + self.mlp(self.ln_2(x))
+        return x
+
+if hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
+    ATTENTION_MODE = 'flash'
+else:
+    try:
+        import xformers
+        import xformers.ops
+        ATTENTION_MODE = 'xformers'
+    except:
+        ATTENTION_MODE = 'math'
+print(f'attention mode is {ATTENTION_MODE}')
+
+def _expand_token(token, batch_size: int):
+    return token.unsqueeze(0).expand(batch_size, -1, -1)
 
 class TextMAEEncoder(nn.Module):
     """
@@ -57,82 +75,49 @@ class TextMAEEncoder(nn.Module):
                  vocab_size=50257, # GPT-2 Vocab Size
                  max_seq_len=256,
                  num_latent_tokens=32,
-                 model_name='bert-base-uncased',
-                 pretrained=True,
-                 tuning_method='full', # 'full', 'lora', 'frozen'
-                 tuning_kwargs={'r': 8},
+                 num_layers=12,
+                 num_heads=12,
+                 width=768,
                  token_drop=0.4,
                  token_drop_max=0.6,
                  ):
         super().__init__()
 
-        self.model_name = model_name
-
-        # 1. Load a BERT-style model from HuggingFace Transformers
-        config = AutoConfig.from_pretrained(model_name)
-        if pretrained:
-            model = AutoModel.from_pretrained(model_name)
-        else:
-            model = AutoModel.from_config(config)
-
-        # Resize token embeddings to match the custom vocab_size
-        if model.config.vocab_size != vocab_size:
-            model.resize_token_embeddings(vocab_size)
-
-        # --- FIX for sequence length ---
-        if max_seq_len > model.config.max_position_embeddings:
-            model = extend_positional_embeddings(model, max_seq_len)
-            
-        # --- Core Parameter Changes from Vision to Text ---
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.token_drop = token_drop
+        self.token_drop_max = token_drop_max
         self.vocab_size = vocab_size
         self.max_seq_len = max_seq_len
-        self.embed_dim = model.config.hidden_size # e.g., 768 for bert-base
-        self.num_prefix_tokens = 1 # For the [CLS] token
-
-        # 2. Adapt the embedding layer
-        # The original patch_embed is replaced by a standard token embedding.
-        # We can just use the one from the BERT model itself.
-        # Note: BERT's `embeddings` layer includes word, position, and token_type embeddings.
-        self.token_embed = model.embeddings
-
-        # --- Tuning Method ---
-        if tuning_method == 'full':
-            self.model = model
-        elif tuning_method == 'lora':
-            # Target modules in BERT are typically in the attention blocks
-            lora_config = peft.LoraConfig(target_modules=r".*attention\.self\.(query|key|value)",
-                                          modules_to_save=['embeddings', 'norm'], **tuning_kwargs)
-            self.model = peft.get_peft_model(model, lora_config)
-            self.model.print_trainable_parameters()
-        elif tuning_method == 'frozen':
-            for param in model.parameters():
-                param.requires_grad = False
-            self.model = model
-
-        # --- Logic kept from the original implementation ---
         self.num_latent_tokens = num_latent_tokens
-        if self.num_latent_tokens:
-            self.latent_tokens = nn.Parameter(torch.zeros(1, self.num_latent_tokens, self.embed_dim))
-            nn.init.normal_(self.latent_tokens, std=.02)
-            # Positional embedding for the latent tokens
-            self.latent_pos_embed = nn.Parameter(torch.zeros(1, self.num_latent_tokens, self.embed_dim))
-            nn.init.normal_(self.latent_pos_embed, std=.02)
+        self.width = width
+
+
+        self.token_embed = nn.Embedding(vocab_size, width)
+
+        scale = width ** -0.5
+
+        self.positional_embedding = nn.Parameter(scale * torch.randn(max_seq_len, width))
+        self.latent_token_positional_embedding = nn.Parameter(scale * torch.randn(num_latent_tokens, width))
+
+        self.ln_pre = nn.LayerNorm(width)
+
+        self.transformer = nn.ModuleList()
+        for i in range(num_layers):
+            self.transformer.append(
+                ResidualAttentionBlock(
+                self.width, self.num_heads, mlp_ratio=4.0
+            ))
+        self.ln_post = nn.LayerNorm(width)
+
 
         # Token dropping (masking) logic is preserved
         self.token_drop = token_drop > 0.0
         if self.token_drop:
             self.mask_ratio_generator = stats.truncnorm((token_drop - token_drop_max) / 0.25, 0, loc=token_drop_max, scale=0.25)
-            self.mask_token_embed = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
+            self.mask_token_embed = nn.Parameter(torch.zeros(1, 1, self.width))
             nn.init.normal_(self.mask_token_embed, std=.02)
 
-        # RoPE/APE logic is removed, as we rely on BERT's internal positional embeddings.
-        # The architecture is simpler and more standard for text models this way.
-
-    def no_weight_decay(self):
-        # Typical parameters to exclude from weight decay for BERT-style models
-        return ['model.embeddings.word_embeddings.weight', 'model.embeddings.position_embeddings.weight', 
-                'model.embeddings.token_type_embeddings.weight', 'bias', 'LayerNorm.weight',
-                'latent_tokens', 'latent_pos_embed']
 
     def sample_orders(self, bsz, seq_len):
         orders = []
@@ -151,12 +136,18 @@ class TextMAEEncoder(nn.Module):
         mask.scatter_(1, masked_indices, True)
         return mask
 
-    def forward(self, input_ids, return_mask=False):
+    def forward(self, input_ids, latent_tokens, return_mask=False):
         # input_ids shape: (batch_size, seq_len)
         
         # 1. Get token embeddings
         # The `model.embeddings` layer handles token, position, and token_type embeddings
-        x = self.token_embed(input_ids=input_ids) # (B, S, D)
+        batch_size = input_ids.size(0)
+        x = input_ids
+        x = self.token_embed(x) # (B, S, D)
+        
+        # Add positional embeddings
+        x = x + self.positional_embedding.to(x.device).to(x.dtype)  # (B, S, D)
+
 
         # 2. Apply token masking (if training)
         mask = None
@@ -166,32 +157,21 @@ class TextMAEEncoder(nn.Module):
             x = torch.where(mask.bool(), self.mask_token_embed, x)
 
         # 3. Add latent tokens
-        if self.num_latent_tokens:
-            z = self.latent_tokens.expand(x.size(0), -1, -1)
-            z = z + self.latent_pos_embed
-            x = torch.cat([x, z], dim=1) # (B, S + num_latents, D)
+        latent_tokens = _expand_token(latent_tokens, batch_size).to(x.dtype).to(x.device)
+        latent_tokens = latent_tokens + self.latent_token_positional_embedding.to(x.device).to(x.dtype)
+        x = torch.cat([x, latent_tokens], dim=1)
 
-        # Create attention mask for the transformer
-        # All tokens (real and latent) can attend to each other
-        attention_mask = torch.ones(x.shape[:2], device=x.device)
-        extended_attention_mask = self.model.get_extended_attention_mask(attention_mask, x.shape, x.device)
+        x = self.ln_pre(x)  # LayerNorm before transformer
 
-        # 4. Pass through the BERT encoder layers
-        # We use the encoder part of the BERT model
-        encoder_outputs = self.model.encoder(
-            x,
-            attention_mask=extended_attention_mask,
-        )
+        # 4. Pass through transformer layers
+        x = x.permute(1, 0, 2)  # (S, B, D) for transformer compatibility
+        for layer in self.transformer:
+            x = layer(x)
+        x = x.permute(1, 0, 2)  # (B, S, D) back to original shape
 
-        x = encoder_outputs.last_hidden_state
-
-        # 5. Extract output tokens
-        if self.num_latent_tokens:
-            # Get z tokens as output
-            out = x[:, -self.num_latent_tokens:]
-        else:
-            # Get all text tokens as output (excluding [CLS] if we want)
-            out = x[:, self.num_prefix_tokens:self.max_seq_len+self.num_prefix_tokens]
+        latent_tokens = x[:, -self.num_latent_tokens:]  # Get the latent tokens
+        latent_tokens = self.ln_post(latent_tokens)  # Final LayerNorm on latent tokens
+        out = latent_tokens
         if return_mask:
             return out, mask
         else:
@@ -207,103 +187,60 @@ class TextMAEDecoder(nn.Module):
                  vocab_size=50257,
                  max_seq_len=256,
                  num_latent_tokens=32,
-                 model_name='bert-base-uncased',
-                 num_decoder_layers=6,
-                 pretrained=True,
-                 tuning_method='full',
-                 tuning_kwargs={'r': 8}
+                 width=768,
+                 num_layers=12,
+                 num_heads=12,
                  ):
         super().__init__()
 
         self.vocab_size = vocab_size
         self.max_seq_len = max_seq_len
         self.num_latent_tokens = num_latent_tokens
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.width = width
         
-        # To create a decoder with a different number of layers, we first load the
-        # pretrained model and then modify its layer structure.
-        if pretrained:
-            decoder_model = AutoModel.from_pretrained(model_name)
-        else:
-            config = AutoConfig.from_pretrained(model_name)
-            decoder_model = AutoModel.from_config(config)
+        scale = width ** -0.5
 
-        # Resize token embeddings to match the custom vocab_size ---
-        if decoder_model.config.vocab_size != vocab_size:
-            decoder_model.resize_token_embeddings(vocab_size)
+        self.positional_embedding = nn.Parameter(scale * torch.randn(max_seq_len, width))
         
-        # --- FIX for sequence length ---
-        # The decoder needs its input sequence length, not the encoder's.
-        # Its input is `max_seq_len` mask tokens + `num_latent_tokens`
-        decoder_input_len = max_seq_len + num_latent_tokens
-        if decoder_input_len > decoder_model.config.max_position_embeddings:
-            decoder_model = extend_positional_embeddings(decoder_model, decoder_input_len)
-            
-        # --- Modify the number of layers for the decoder ---
-        # Truncate the list of layers to the desired number
-        decoder_model.encoder.layer = decoder_model.encoder.layer[:num_decoder_layers]
-        decoder_model.config.num_hidden_layers = num_decoder_layers # Update config for consistency
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, width))
+        self.latent_token_positional_embedding = nn.Parameter(scale * torch.randn(num_latent_tokens, width))
 
-        self.embed_dim = decoder_model.config.hidden_size
-        self.num_prefix_tokens = 0 # Decoder doesn't need a CLS token for its sequence
+        self.ln_pre = nn.LayerNorm(width)
 
-        # --- Tuning Method ---
-        if tuning_method == 'full':
-            self.model = decoder_model
-        elif tuning_method == 'lora':
-            lora_config = peft.LoraConfig(target_modules=r".*attention\.self\.(query|key|value)",
-                                          modules_to_save=['embeddings', 'norm'], **tuning_kwargs)
-            self.model = peft.get_peft_model(decoder_model, lora_config)
-            self.model.print_trainable_parameters()
-        elif tuning_method == 'frozen':
-            for param in decoder_model.parameters():
-                param.requires_grad = False
-            self.model = decoder_model
+        self.transformer = nn.ModuleList()
+        for i in range(num_layers):
+            self.transformer.append(
+                ResidualAttentionBlock(
+                    width, num_heads, mlp_ratio=4.0
+                )
+            )
+        self.ln_post = nn.LayerNorm(width)
 
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
-        nn.init.normal_(self.mask_token, std=.02)
+        self.decoder_head = nn.Linear(self.width, self.vocab_size)
 
-        self.latent_pos_embed = nn.Parameter(torch.zeros(1, self.num_latent_tokens, self.embed_dim))
-        nn.init.normal_(self.latent_pos_embed, std=.02)
-
-        self.decoder_norm = nn.LayerNorm(self.embed_dim)
-        self.decoder_head = nn.Linear(self.embed_dim, self.vocab_size)
-        
-    def no_weight_decay(self):
-        return ['model.embeddings.word_embeddings.weight', 'model.embeddings.position_embeddings.weight', 
-                'model.embeddings.token_type_embeddings.weight', 'bias', 'LayerNorm.weight',
-                'mask_token', 'latent_pos_embed']
-
-    @property
-    def last_layer(self):
-        return self.decoder_head
 
     def forward(self, z):
-        x = self.mask_token.expand(z.size(0), self.max_seq_len, -1)
-        
-        position_ids = torch.arange(self.max_seq_len, device=z.device).expand(z.size(0), -1)
-        
-        # We need to manually add positional embeddings since we're not passing `input_ids`
-        pos_embed = self.model.embeddings.position_embeddings(position_ids)
-        x = x + pos_embed
+        batch_size, seq_len, _ = z.size()
 
-        z = z + self.latent_pos_embed
-        
-        x = torch.cat([x, z], dim=1)
+        masked_tokens = self.mask_token.repeat(batch_size, self.max_seq_len, 1).to(z.device).to(z.dtype)
+        masked_tokens = masked_tokens + self.positional_embedding.to(z.device).to(z.dtype)
 
-        attention_mask = torch.ones(x.shape[:2], device=x.device)
-        extended_attention_mask = self.model.get_extended_attention_mask(attention_mask, x.shape)
-        
-        decoder_outputs = self.model.encoder(
-            x,
-            attention_mask=extended_attention_mask,
-        )
-        x = decoder_outputs.last_hidden_state
-        
-        x = x[:, :self.max_seq_len]
+        z = z + self.latent_token_positional_embedding[:seq_len].to(z.device).to(z.dtype)
+        z = torch.cat([masked_tokens, z], dim=1)  # Concatenate masked tokens with latent tokens
 
-        x = self.decoder_norm(x)
+        z = self.ln_pre(z)  # LayerNorm before transformer
 
-        logits = self.decoder_head(x)
+        z = z.permute(1, 0, 2)  # (S, B, D) for transformer compatibility
+        for layer in self.transformer:
+            z = layer(z)
+        z = z.permute(1, 0, 2)
+
+        z = z[:, :self.max_seq_len]  # Keep only the relevant part
+        z = self.ln_post(z)  # Final LayerNorm
+
+        logits = self.decoder_head(z)
 
         return logits
 
@@ -323,22 +260,28 @@ if __name__ == '__main__':
         vocab_size=VOCAB_SIZE,
         max_seq_len=MAX_SEQ_LEN,
         num_latent_tokens=NUM_LATENT_TOKENS,
-        model_name='bert-base-uncased' # Could be 'distilbert-base-uncased' for a lighter model
+        num_layers=12,  # BERT-style encoder
+        num_heads=12,
+        width=768,  # BERT base width
+        token_drop=0.4,  # Example token drop rate
+        token_drop_max=0.6  # Example max token drop rate
     )
 
     decoder = TextMAEDecoder(
         vocab_size=VOCAB_SIZE,
         max_seq_len=MAX_SEQ_LEN,
         num_latent_tokens=NUM_LATENT_TOKENS,
-        model_name='bert-base-uncased', # Using same arch for simplicity
-        num_decoder_layers=4 # A shallower decoder
+        width=768,  # BERT base width
+        num_layers=12,  # BERT-style decoder
+        num_heads=12
     )
     
     encoder.train() # Set to train mode to enable masking
     decoder.train()
 
+    latent_tokens = torch.randn(NUM_LATENT_TOKENS, 768)  # Randomly initialized latent tokens
     # 3. Forward pass
-    latent_representation, mask = encoder(dummy_input_ids, return_mask=True)
+    latent_representation, mask = encoder(dummy_input_ids, latent_tokens=latent_tokens, return_mask=True)
     reconstructed_logits = decoder(latent_representation)
 
     print("--- Encoder ---")

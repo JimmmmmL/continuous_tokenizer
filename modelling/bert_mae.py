@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
+# import sys
+# sys.path.append('/data1/jl14087/continuous_tokenizer/')
 from transformers import AutoModel, AutoConfig
 from modelling.modules.bert_mae_models import TextMAEEncoder, TextMAEDecoder
 
 @dataclass
 class TextMAEArgs:
     # --- Language Model Config ---
-    bert_model_name: str = 'bert-base-uncased'
     vocab_size: int = 50257
     max_seq_len: int = 512
     
@@ -15,20 +16,15 @@ class TextMAEArgs:
     codebook_embed_dim: int = 32
     num_latent_tokens: int = 128
 
-    # --- Training Config ---
-    enc_pretrained: bool = True
-    dec_pretrained: bool = True
+    # --- Transformer Config ---
+    num_layer: int = 12
+    num_heads: int = 12
+    width: int = 768
     
     # --- Masked Modeling Config ---
-    use_masked_modeling: bool = True
     token_drop_rate: float = 0.4  # Minimum mask rate
     token_drop_rate_max: float = 0.6  # Maximum mask rate
 
-    # --- Encoder Config ---
-    encoder_tuning_method: str = 'full'  # Options: 'full', 'partial', 'none'
-    # --- Decoder Config ---
-    num_decoder_layers: int = 12
-    decoder_tuning_method: str = 'full'  # Options: 'full', 'partial', 'none'
     
 
 class TextMAE(nn.Module):
@@ -45,34 +41,56 @@ class TextMAE(nn.Module):
             vocab_size=config.vocab_size,
             max_seq_len=config.max_seq_len,
             num_latent_tokens=config.num_latent_tokens,
-            model_name=config.bert_model_name,
-            pretrained=config.enc_pretrained,
-            tuning_method=config.encoder_tuning_method,
+            num_layers=config.num_layer,
+            num_heads=config.num_heads,
+            width=config.width,
             token_drop=config.token_drop_rate,
             token_drop_max=config.token_drop_rate_max,
         )
         
         # 2. Setup the bottleneck (quantization) layers
         # This layer reduces the dimension of the encoder's output latents
-        self.quant_conv = nn.Linear(self.encoder.embed_dim, config.codebook_embed_dim)
+        self.quant_conv = nn.Linear(self.encoder.width, config.codebook_embed_dim)
         # This layer expands the dimension back for the decoder
-        self.post_quant_conv = nn.Linear(config.codebook_embed_dim, self.encoder.embed_dim) # Assuming enc/dec have same dim
+        self.post_quant_conv = nn.Linear(config.codebook_embed_dim, self.encoder.width) # Assuming enc/dec have same dim
         
         # 3. Setup Decoder
         self.decoder = TextMAEDecoder(
             vocab_size=config.vocab_size,
             max_seq_len=config.max_seq_len,
             num_latent_tokens=config.num_latent_tokens,
-            model_name=config.bert_model_name,
-            num_decoder_layers=config.num_decoder_layers,
-            pretrained=config.dec_pretrained,
-            tuning_method=config.decoder_tuning_method,
+            num_layers=config.num_layer,
+            num_heads=config.num_heads,
+            width=config.width,
         )
 
         # Ensure post_quant_conv output dimension matches decoder's expected input dimension
-        if self.encoder.embed_dim != self.decoder.embed_dim:
-             self.post_quant_conv = nn.Linear(config.codebook_embed_dim, self.decoder.embed_dim)
+        if self.encoder.width != self.decoder.width:
+            self.post_quant_conv = nn.Linear(config.codebook_embed_dim, self.decoder.width)
 
+        # Latent tokens
+        self.num_latent_tokens = config.num_latent_tokens
+        scale = self.encoder.width ** -0.5
+        self.latent_tokens = nn.Parameter(
+            scale * torch.randn(config.num_latent_tokens, config.width)
+        )
+
+        self.apply(self._init_weights)
+    
+    def _init_weights(self, module):
+        """ Initialize the weights.
+            :param:
+                module -> torch.nn.Module: module to initialize
+        """
+        if isinstance(module, nn.Linear) or isinstance(module, nn.Conv1d) or isinstance(module, nn.Conv2d):
+            module.weight.data = nn.init.trunc_normal_(module.weight.data, mean=0.0, std=0.02)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            module.weight.data = nn.init.trunc_normal_(module.weight.data, mean=0.0, std=0.02)
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
 
     def encode(self, input_ids, return_mask=False):
         """
@@ -88,8 +106,8 @@ class TextMAE(nn.Module):
         """
         # Get high-dimensional latents and the mask from the encoder
         # h has shape (B, num_latent_tokens, encoder_embed_dim)
-        h, mask = self.encoder(input_ids, return_mask=True)
-        
+        h, mask = self.encoder(input_ids, self.latent_tokens, return_mask=True)
+
         # Compress to the codebook dimension
         # latent has shape (B, num_latent_tokens, codebook_embed_dim)
         latent = self.quant_conv(h)
