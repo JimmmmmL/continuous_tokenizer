@@ -21,9 +21,9 @@ num_latent_tokens: 128
 codebook_embed_dim: 32
 vocab_size: 50257
 max_seq_len: 512
-num_layers: 12
-num_heads: 12
-width: 768
+num_layer: 24
+num_heads: 16
+width: 1024
 
 token_drop_rate: 0.4
 token_drop_rate_max: 0.6
@@ -38,7 +38,7 @@ weight_decay: 0.0001
 beta1: 0.9
 beta2: 0.95
 max_grad_norm: 1.0
-global_batch_size: 128
+global_batch_size: 32
 eval_batch_size: 8
 gradient_accumulation_steps: 1
 

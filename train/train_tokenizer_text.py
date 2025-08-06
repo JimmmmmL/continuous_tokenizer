@@ -123,7 +123,7 @@ def main(args):
             max_seq_len=args.max_seq_len,
             num_latent_tokens=args.num_latent_tokens,
             codebook_embed_dim=args.codebook_embed_dim,
-            num_layers=args.num_layers,
+            num_layer=args.num_layer,
             num_heads=args.num_heads,
             width=args.width,
             token_drop_rate=args.token_drop_rate,
@@ -201,7 +201,7 @@ def main(args):
         vq_model = torch.compile(vq_model) # requires PyTorch 2.0       
         logger.info("compiling done.")
     
-    vq_model = DDP(vq_model.to(device), device_ids=[args.gpu], find_unused_parameters=True)
+    vq_model = DDP(vq_model.to(device), device_ids=[args.gpu], find_unused_parameters=False)
     vq_model.train()
     if args.ema:
         ema.eval()  # EMA model should always be in eval mode
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-latent-tokens", type=int, default=128)
     parser.add_argument("--vocab-size", type=int, default=50257, help="vocab size for text tokenizer")
     parser.add_argument("--max-seq-len", type=int, default=512, help="maximum sequence length for text tokenizer")
-    parser.add_argument("--num_layers", type=int, default=12, help="number of layers/blocks in the encoder/decoder")
+    parser.add_argument("--num_layer", type=int, default=12, help="number of layers/blocks in the encoder/decoder")
     parser.add_argument("--num-heads", type=int, default=12, help="number of attention heads in the encoder/decoder")
     parser.add_argument("--width", type=int, default=768, help="hidden dimension of the encoder/decoder")
 
